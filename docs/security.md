@@ -46,8 +46,9 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 ## 4. Secrets
 
 1. All secrets go through sops-nix (age) only. Secrets MUST NOT appear in the Nix store, in git in plaintext, in logs, in unit environment variables, or on command lines.
-2. The host age key is derived from the SSH host key; only public keys live in the repo.
-3. Secret inventory and rotation:
+2. The host age key is derived from the SSH host key.
+3. Secrets and office-specific values (time zone, admin keys, speaker MAC, Entra/Teams IDs) live only in the private `jukebox-private` repo. This repo is public: it holds code, `docs/private-example.nix` with placeholder values, and nothing that identifies the office.
+4. Secret inventory and rotation:
 
 | Secret | Rotation |
 |---|---|
@@ -58,7 +59,7 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 | Admin sudo password (yescrypt hash, `admin-password`) | On administrator change |
 | MA long-lived token for the bridge (`bridge/ma-token`) | On leak; revoke in MA profile settings |
 
-4. Secrets reach services via `LoadCredential=` or a 0400 file owned by the service user.
+5. Secrets reach services via `LoadCredential=` or a 0400 file owned by the service user.
 
 ## 5. Accounts
 
@@ -99,11 +100,17 @@ Every directive left off carries a one-line comment with the reason.
 
 ## 8. Music Assistant
 
-1. Only providers in use are enabled. These MUST NOT be enabled without a recorded decision: `fastmcp_server`, `openai_compatible`, `openai_tts`, `ai_radio` (send data externally), `airplay_receiver`, `spotify_connect`, `sendspin_source`, `ariacast_receiver`, `vban_receiver` (accept external audio), `hass`, `hass_players`.
+1. Only providers in use are enabled. These MUST NOT be enabled without a recorded decision: `openai_compatible`, `openai_tts`, `ai_radio` (send data externally), `airplay_receiver`, `spotify_connect`, `sendspin_source`, `ariacast_receiver`, `vban_receiver` (accept external audio), `hass`, `hass_players`.
 2. Party: add-to-queue, boost and skip token limits and refill rates are set explicitly, never left at defaults without review. Party has no track-length limit; that is enforced by the bridge (§9).
 3. The guest URL is shared only inside the company (Teams channel, QR codes in the office); never posted publicly.
 4. Playback is possible only within `jukebox.workHours` (squeezelite is stopped outside it, `modules/work-hours.nix`). A system-level volume ceiling is still required — not implemented yet.
 5. MA Remote Access is disabled — Party supports it, and it would expose the guest view outside the office network.
+6. MCP (`fastmcp_server`, decision 2026-11-07: admin control from an AI client):
+   - "Require authentication" stays on; one Connect Wizard token per client, revoked when the client is retired.
+   - Enabled permissions: query, playback control, queue management. Edit/Delete permissions and the Debug and Config namespaces stay off.
+   - "Confirm destructive operations" stays on.
+   - The endpoint shares port 8095 with the guest view, so it is reachable from staff segments; clients connect only through an SSH tunnel from the admin segment (MA serves plain HTTP — a token sent over the LAN is readable).
+   - Library, queue and player names reach the AI vendor through the client; nothing beyond that is exposed.
 
 ## 9. Teams bridge
 

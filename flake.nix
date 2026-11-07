@@ -19,6 +19,8 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Office values + sops secrets, kept out of this public repo. See docs/private-example.nix.
+    private.url = "git+ssh://git@github.com/4rmcyt/jukebox-private.git";
   };
 
   outputs = {
@@ -27,11 +29,13 @@
     lanzaboote,
     nix-mineral,
     sops-nix,
+    private,
     ...
   }: let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
   in {
     nixosConfigurations.jukebox = nixpkgs.lib.nixosSystem {
+      specialArgs = {inherit private;};
       modules = [
         disko.nixosModules.disko
         lanzaboote.nixosModules.lanzaboote

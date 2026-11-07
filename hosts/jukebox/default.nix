@@ -1,4 +1,10 @@
-{lib, ...}: {
+{
+  lib,
+  private,
+  ...
+}: let
+  office = private.lib.office;
+in {
   imports = [../../modules];
 
   networking.hostName = "jukebox";
@@ -7,10 +13,8 @@
   hardware.facter.reportPath = lib.mkIf (builtins.pathExists ./facter.json) ./facter.json;
 
   jukebox = {
-    timeZone = "UTC";
-    adminKeys = [];
-    speakerMac = null;
-    workHours.days = ["Mon" "Tue" "Wed" "Thu" "Fri"];
+    inherit (office) timeZone adminKeys speakerMac bridge;
+    workHours.days = office.workDays;
   };
 
   system.stateVersion = "26.05";

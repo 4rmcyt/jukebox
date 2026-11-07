@@ -8,6 +8,8 @@ _: {
       "squeezelite"
       "lrclib"
       "milkdrop_visualizer"
+      # MCP on /mcp/v1 of the MA webserver; permissions and access in docs/security.md §8.6.
+      "fastmcp_server"
     ];
   };
 

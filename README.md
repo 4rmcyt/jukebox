@@ -23,8 +23,12 @@ modules/
   kiosk.nix                cage + Chromium kiosk with enterprise policies
   teams-bridge.nix         Teams bridge service (off until jukebox.bridge.enable)
 bridge/                    Teams bridge: Graph polling -> Music Assistant -> Workflows replies
-secrets/jukebox.yaml       sops-encrypted secrets
+docs/private-example.nix   schema of the private input
 ```
+
+Office-specific values (time zone, admin keys, speaker MAC, work days, Entra/Teams IDs) and the sops secrets live in the private repo `jukebox-private`, consumed as the `private` flake input. Nothing office-specific goes into this repo.
+
+To work on an unpushed private checkout: `--override-input private path:../jukebox-private`.
 
 ```
 phones ──8095──► Music Assistant ──slimproto (lo)──► squeezelite ──► PipeWire ──► BT speaker
@@ -39,7 +43,7 @@ TV ◄── cage/Chromium ◄──────┘  └──► bgutil PO Toke
    sudo nix-shell -p nixos-facter --run nixos-facter > facter.json
    ```
    Copy it to `hosts/jukebox/facter.json`.
-3. Fill in `hosts/jukebox/default.nix`: `timeZone`, `adminKeys`. Leave `speakerMac = null` until the speaker is paired.
+3. Fill in `office.nix` in the private repo: `timeZone`, `adminKeys`, `workDays`. Leave `speakerMac = null` until the speaker is paired.
 4. Partition (prompts for the LUKS recovery passphrase — store it offline):
    ```sh
    sudo nix run github:nix-community/disko/latest -- --mode destroy,format,mount --flake .#jukebox
@@ -55,11 +59,12 @@ TV ◄── cage/Chromium ◄──────┘  └──► bgutil PO Toke
    sudo ssh-keygen -t ed25519 -N "" -f /mnt/etc/ssh/ssh_host_ed25519_key
    nix run nixpkgs#ssh-to-age < /mnt/etc/ssh/ssh_host_ed25519_key.pub
    ```
-   Put that recipient and your admin age key into `.sops.yaml`, then on the admin workstation:
+   Put that recipient and your admin age key into the private repo's `.sops.yaml`, then there:
    ```sh
    mkpasswd -m yescrypt          # admin sudo password hash
    sops secrets/jukebox.yaml     # admin-password: <hash>
    ```
+   Commit and push the private repo, then `nix flake update private` here.
 7. Install and reboot:
    ```sh
    sudo nixos-install --flake .#jukebox --no-root-passwd
@@ -86,7 +91,7 @@ bluetoothctl
   connect <MAC>
 ```
 
-Set `jukebox.speakerMac = "<MAC>"` and redeploy; `bt-reconnect.timer` then reconnects every minute. Pairable/discoverable fall back to off after 180 s.
+Set `speakerMac = "<MAC>"` in the private `office.nix` and redeploy; `bt-reconnect.timer` then reconnects every minute. Pairable/discoverable fall back to off after 180 s.
 
 ## Music Assistant setup (web UI, `http://jukebox:8095`)
 
@@ -95,11 +100,12 @@ Set `jukebox.speakerMac = "<MAC>"` and redeploy; `bt-reconnect.timer` then recon
 3. Music sources → YouTube Music: Login Cookie from the dedicated Google account, PO Token server `http://127.0.0.1:4416`.
 4. Plugins → Party: Venue mode, player = Jukebox; set add/boost/skip token limits (§8.2 of the security doc).
 5. Plugins → Music Quiz: Venue mode, player = Jukebox.
-6. Kiosk: attach a keyboard once, log in to MA in the kiosk browser, open the Party dashboard, detach the keyboard.
+6. Plugins → FastMCP Server: keep "Require authentication" and "Confirm destructive operations" on; enable only query, control and queue permissions (§8.6 of the security doc).
+7. Kiosk: attach a keyboard once, log in to MA in the kiosk browser, open the Party dashboard, detach the keyboard.
 
 ## Work hours
 
-`jukebox.workHours` (`days`, `start`, `end`, local time). Outside the window squeezelite is stopped and Music Assistant has no player; guests can still queue, playback resumes when the window opens.
+`jukebox.workHours` (`days` from the private `workDays`, `start` 07:00, `end` 17:00, local time). Outside the window squeezelite is stopped and Music Assistant has no player; guests can still queue, playback resumes when the window opens.
 
 ## Teams bridge
 
@@ -115,7 +121,7 @@ Commands in the jukebox channel: `!dj play <song or link>`, `!dj skip` (vote), `
 3. **RSC:** in Teams Developer Portal create an app bound to that registration, add RSC permission `ChannelMessage.Read.Group` (Application), install it into the Jukebox team.
 4. **Workflows:** in the Jukebox channel create a flow from the template "Post to a channel when a webhook request is received", owned by a service account; copy the URL.
 5. **MA token:** in the MA web UI, profile → create a long-lived token for the bridge.
-6. Secrets (`sops secrets/jukebox.yaml`), then delete the local key files:
+6. Secrets (`sops secrets/jukebox.yaml` in the private repo), then delete the local key files:
    ```yaml
    bridge:
      graph-key: <contents of bridge.key>
@@ -123,9 +129,9 @@ Commands in the jukebox channel: `!dj play <song or link>`, `!dj skip` (vote), `
      ma-token: <token>
      workflows-url: <url>
    ```
-7. Host config:
+7. Private `office.nix`:
    ```nix
-   jukebox.bridge = {
+   bridge = {
      enable = true;
      tenantId = "...";
      clientId = "...";
@@ -134,6 +140,16 @@ Commands in the jukebox channel: `!dj play <song or link>`, `!dj skip` (vote), `
      adminIds = ["<entra object id>"];
    };
    ```
+
+## MCP (Claude and other AI clients)
+
+Music Assistant serves MCP at `/mcp/v1` on port 8095. From the admin segment, tunnel it and point the client at the loopback end:
+
+```sh
+ssh -N -L 18095:127.0.0.1:8095 admin@jukebox
+```
+
+In MA: Plugins → FastMCP Server → Open Connect Wizard → pick the client; it mints a per-client token and prints the config block. Replace the URL in it with `http://127.0.0.1:18095/mcp/v1`.
 
 ## Deploy
 
