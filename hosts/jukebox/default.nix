@@ -9,11 +9,11 @@ in {
 
   networking.hostName = "jukebox";
   nixpkgs.hostPlatform = "x86_64-linux";
-  # Generated on the Tiny with nixos-facter, see README.
-  hardware.facter.reportPath = lib.mkIf (builtins.pathExists ./facter.json) ./facter.json;
+  # Hardware report (MACs, serials) lives in the private repo, see docs/installation.md §4.
+  hardware.facter.reportPath = lib.mkIf (builtins.pathExists "${private}/facter.json") "${private}/facter.json";
 
   jukebox = {
-    inherit (office) timeZone adminKeys speakerMac bridge;
+    inherit (office) timeZone adminKeys speakerMac bridge fqdn acmeEmail adminNets;
     workHours.days = office.workDays;
   };
 

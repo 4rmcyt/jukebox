@@ -13,6 +13,7 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 | Google account cookie (YT Music) | Full access to the Google account |
 | Entra app credentials (Graph) | Reading the jukebox team's channel messages |
 | Workflows webhook URL | Posting arbitrary content to the channel |
+| Cloudflare DNS API token | Editing DNS records of the company zone — redirecting company hostnames, issuing certificates for them |
 | Teams channel messages | Leak of employee conversations |
 | The device itself | Disk theft with secrets on it |
 
@@ -24,8 +25,8 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 
 1. The Tiny MUST sit in a dedicated VLAN.
 2. FTD ACL, inbound to the jukebox VLAN:
-   - from staff segments — TCP to the MA web port (guest/Party view) only;
-   - SSH — from the admin segment only;
+   - from staff segments — TCP 443 (Caddy, TLS) only;
+   - from the admin segment — TCP 443 and SSH;
    - from the internet — nothing. NAT/port forwarding from outside MUST NOT exist.
 3. FTD ACL, outbound from the jukebox VLAN:
    - TCP 443 to the internet (YouTube/Google, Microsoft Graph, Workflows endpoint, Nix caches);
@@ -35,6 +36,7 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 5. Internal links (MA ↔ squeezelite, MA ↔ PO Token server, bridge ↔ MA API) MUST bind to loopback where the service supports it; otherwise they are closed by the host firewall. ⚠ check MA and squeezelite bind options.
 6. `services.music-assistant.openFirewall` MUST NOT be used (it opens high-port ranges for AirPlay/Spotify Connect). Ports are opened one by one.
 7. No mDNS/UPnP/SSDP announcements leave the VLAN.
+8. All client traffic is TLS: Caddy terminates HTTPS on 443 with a publicly trusted Let's Encrypt certificate (DNS-01, no inbound port) and proxies to MA on loopback. MA's webserver binds `127.0.0.1`; plain HTTP is never exposed. Port 80 and HTTP/3 stay closed. The hostname appears in public Certificate Transparency logs; it MUST NOT reveal more than "jukebox" (no office/location names).
 
 ## 3. Administrative access
 
@@ -58,6 +60,7 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 | MA admin password | On administrator change |
 | Admin sudo password (yescrypt hash, `admin-password`) | On administrator change |
 | MA long-lived token for the bridge (`bridge/ma-token`) | On leak; revoke in MA profile settings |
+| Cloudflare DNS token (`cloudflare-dns-env`) | Scope: Zone → DNS → Edit on the company zone only, client IP filter = office egress IP, expiry ≤ 12 months; rotate on expiry or leak |
 
 5. Secrets reach services via `LoadCredential=` or a 0400 file owned by the service user.
 
@@ -109,7 +112,7 @@ Every directive left off carries a one-line comment with the reason.
    - "Require authentication" stays on; one Connect Wizard token per client, revoked when the client is retired.
    - Enabled permissions: query, playback control, queue management. Edit/Delete permissions and the Debug and Config namespaces stay off.
    - "Confirm destructive operations" stays on.
-   - The endpoint shares port 8095 with the guest view, so it is reachable from staff segments; clients connect only through an SSH tunnel from the admin segment (MA serves plain HTTP — a token sent over the LAN is readable).
+   - Reached at `https://<fqdn>/mcp/v1` over TLS; Caddy answers 403 on `/mcp/*` for any source outside `jukebox.adminNets`.
    - Library, queue and player names reach the AI vendor through the client; nothing beyond that is exposed.
 
 ## 9. Teams bridge
@@ -150,6 +153,7 @@ Every directive left off carries a one-line comment with the reason.
 | Cookie leak / suspicion | Google: sign out all sessions, change password; new cookie into sops |
 | Graph credential leak | Revoke the certificate in Entra; issue a new one |
 | Webhook URL leak | Delete and recreate the flow |
+| Cloudflare token leak | Roll/delete the token in Cloudflare; review the zone's audit log and DNS records for changes; new token into sops |
 | Host compromise | Isolate the VLAN; collect the journal; reinstall from scratch; rotate every secret in §4 |
 | Device theft | Rotate every secret in §4; remove its SSH host key from known_hosts and its FTD rules |
 
@@ -157,7 +161,9 @@ Every directive left off carries a one-line comment with the reason.
 
 Before going live and after any major change:
 
-- [ ] `nmap` from a staff VLAN: only the MA guest-view port is open
+- [ ] `nmap` from a staff VLAN: only TCP 443 is open (8095, 80, 22 closed)
+- [ ] A personal phone opens `https://<fqdn>` without a certificate warning; Party QR links use `https://<fqdn>`
+- [ ] `/mcp/v1` returns 403 from a staff VLAN
 - [ ] No internal segment is reachable from the jukebox VLAN
 - [ ] MA admin UI is unreachable without login
 - [ ] `systemd-analyze security <unit>` for every unit; deviations justified

@@ -20,6 +20,18 @@ in {
       type = types.listOf types.str;
       description = "SSH public keys for the admin account.";
     };
+    fqdn = mkOption {
+      type = types.str;
+      description = "Public DNS name of the jukebox (internal A record, Let's Encrypt cert via Cloudflare DNS-01).";
+    };
+    acmeEmail = mkOption {
+      type = types.str;
+      description = "Let's Encrypt account email.";
+    };
+    adminNets = mkOption {
+      type = types.nonEmptyListOf types.str;
+      description = "CIDRs of the admin segment; the only sources allowed to reach /mcp/*.";
+    };
     kioskUser = mkOption {
       type = types.str;
       default = "kiosk";

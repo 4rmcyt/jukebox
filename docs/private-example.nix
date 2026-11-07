@@ -4,6 +4,9 @@
   adminKeys = ["ssh-ed25519 AAAA... admin@workstation"];
   speakerMac = "AA:BB:CC:DD:EE:FF";
   workDays = ["Mon" "Tue" "Wed" "Thu" "Fri"];
+  fqdn = "jukebox.example.com";
+  acmeEmail = "it@example.com";
+  adminNets = ["192.0.2.0/28"];
 
   bridge = {
     enable = true;

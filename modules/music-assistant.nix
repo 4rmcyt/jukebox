@@ -13,8 +13,7 @@ _: {
     ];
   };
 
-  # Web UI + Party guest view only; stream/slimproto ports stay closed, squeezelite connects over loopback.
-  networking.firewall.allowedTCPPorts = [8095];
+  # No firewall ports: clients reach MA only through Caddy (modules/caddy.nix); MA binds 127.0.0.1 (set in its UI).
 
   # Upstream module already sets DynamicUser, empty capabilities, @system-service filter, Protect*.
   systemd.services.music-assistant = {
