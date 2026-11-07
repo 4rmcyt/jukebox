@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
-
 from music_assistant_client import MusicAssistantClient
 from music_assistant_models.enums import MediaType, QueueOption
+from music_assistant_models.errors import MusicAssistantError
+from music_assistant_models.media_items import Track
 
 from .config import Config
+from .links import LinkError, to_uri
 from .tracker import PlayTracker
 
 
@@ -28,25 +29,32 @@ class Jukebox:
                 return queue.queue_id
         raise JukeboxError("the speaker is offline (outside work hours?)")
 
-    def _check_url(self, url: str) -> None:
-        host = (urlparse(url).hostname or "").lower()
-        if not any(host == d or host.endswith(f".{d}") for d in self._cfg.allowed_domains):
-            raise JukeboxError("links are accepted only from: " + ", ".join(self._cfg.allowed_domains))
+    async def _resolve_link(self, url: str) -> Track:
+        try:
+            uri = to_uri(url, self._cfg.allowed_domains)
+        except LinkError as err:
+            raise JukeboxError(str(err)) from err
+        if uri is None:
+            raise JukeboxError("links are accepted only from: " + ", ".join(sorted(self._cfg.allowed_domains)))
+        try:
+            item = await self._client.music.get_item_by_uri(uri)
+        except MusicAssistantError as err:
+            raise JukeboxError("track not found") from err
+        if not isinstance(item, Track) or not any(m.available for m in item.provider_mappings):
+            raise JukeboxError("this track is not available")
+        return item
 
     async def play(self, query: str, author_id: str, author_name: str) -> str:
         if not query:
             raise JukeboxError("usage: play <song or link>")
         queue_id = self._queue_id()
         if query.startswith(("http://", "https://")):
-            self._check_url(query)
-            # TODO: verify MA resolves YT Music URLs to tracks; duration is not checked and the play is not attributed for links.
-            await self._client.player_queues.play_media(queue_id, query, option=QueueOption.ADD)
-            return "added link to the queue"
-
-        results = await self._client.music.search(query, [MediaType.TRACK], limit=1)
-        if not results.tracks:
-            raise JukeboxError(f"nothing found for “{query}”")
-        track = results.tracks[0]
+            track = await self._resolve_link(query)
+        else:
+            results = await self._client.music.search(query, [MediaType.TRACK], limit=1)
+            if not results.tracks:
+                raise JukeboxError(f"nothing found for “{query}”")
+            track = results.tracks[0]
         # Results may be ItemMapping (no duration/artists) as well as full Track objects.
         duration = getattr(track, "duration", 0) or 0
         if duration > self._cfg.max_track_seconds:

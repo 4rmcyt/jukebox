@@ -59,8 +59,9 @@ in {
       description = "Entra object IDs allowed to run admin commands.";
     };
     allowedDomains = mkOption {
-      type = types.listOf types.str;
+      type = types.listOf (types.enum ["music.youtube.com" "youtube.com" "youtu.be"]);
       default = ["music.youtube.com" "youtube.com" "youtu.be"];
+      description = "Link sources accepted as orders; each value needs a parser in bridge/jukebox_bridge/links.py.";
     };
     retentionDays = mkOption {
       type = types.ints.positive;

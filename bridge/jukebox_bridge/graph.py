@@ -14,6 +14,7 @@ import aiohttp
 import msal
 
 from .config import Config
+from .links import URL_IN_TEXT
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 SCOPE = "https://graph.microsoft.com/.default"
@@ -27,21 +28,30 @@ class Message:
     author_id: str
     author_name: str
     text: str
+    links: tuple[str, ...] = ()
 
 
 class _TextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.parts: list[str] = []
+        self.hrefs: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            self.hrefs += [v for k, v in attrs if k == "href" and v]
 
     def handle_data(self, data: str) -> None:
         self.parts.append(data)
 
 
-def html_to_text(content: str) -> str:
+def parse_body(content: str) -> tuple[str, tuple[str, ...]]:
+    """Return the plain text and the links (anchor targets first, then bare URLs) of a message."""
     parser = _TextExtractor()
     parser.feed(content)
-    return unescape(" ".join("".join(parser.parts).split()))
+    text = unescape(" ".join("".join(parser.parts).split()))
+    links = [unescape(h) for h in parser.hrefs] + URL_IN_TEXT.findall(text)
+    return text, tuple(dict.fromkeys(links))
 
 
 class GraphPoller:
@@ -87,8 +97,8 @@ class GraphPoller:
             user = (item.get("from") or {}).get("user")
             if not user:
                 continue
-            text = html_to_text(item["body"]["content"])
+            text, links = parse_body(item["body"]["content"])
             messages.append(
-                (created, Message(item["id"], user["id"], user.get("displayName", ""), text))
+                (created, Message(item["id"], user["id"], user.get("displayName", ""), text, links))
             )
         return [m for _, m in sorted(messages, key=lambda pair: pair[0])]

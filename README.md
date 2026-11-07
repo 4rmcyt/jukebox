@@ -4,6 +4,7 @@ Office jukebox on a Lenovo ThinkCentre Tiny: [Music Assistant](https://www.music
 
 - Install: [docs/installation.md](docs/installation.md)
 - Security requirements: [docs/security.md](docs/security.md) — read before changing anything.
+- Compose variant for any Linux host (planned): [docs/design-compose.md](docs/design-compose.md)
 
 ## Layout
 

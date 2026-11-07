@@ -48,7 +48,7 @@ class Config:
     workflows_url: str
     prefix: str
     admin_ids: frozenset[str]
-    allowed_domains: tuple[str, ...]
+    allowed_domains: frozenset[str]
     poll_seconds: float
     max_track_seconds: int
     skip_votes: int
@@ -73,7 +73,7 @@ class Config:
             workflows_url=workflows_url(),
             prefix=_env("PREFIX", "!dj"),
             admin_ids=frozenset(_env_list("ADMIN_IDS")),
-            allowed_domains=_env_list("ALLOWED_DOMAINS"),
+            allowed_domains=frozenset(_env_list("ALLOWED_DOMAINS")),
             poll_seconds=float(_env("POLL_SECONDS", "3")),
             max_track_seconds=int(_env("MAX_TRACK_SECONDS", "480")),
             skip_votes=int(_env("SKIP_VOTES", "3")),

@@ -10,7 +10,7 @@ ADMIN_COMMANDS = frozenset({"stop"})
 MAX_ARG_LENGTH = 200
 
 HELP = (
-    "play <song or link> · skip (vote) · np (now playing) · stats (last 7 days)"
+    "post a YouTube Music / YouTube track link, or play <song or link> · skip (vote) · np (now playing) · stats (last 7 days)"
     " · stats optout / optin (hide or show yourself in the top DJs) · help"
 )
 

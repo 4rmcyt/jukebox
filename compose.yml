@@ -1,0 +1,102 @@
+# Jukebox for any Linux host with Docker: see docs/design-compose.md. Settings in .env, secrets in ./secrets/.
+
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+services:
+  music-assistant:
+    <<: *hardening
+    image: ghcr.io/music-assistant/server:2.10.9@sha256:4ac0d5844363fbbefd6a61251df09d96cd546e05e01b8c1cc1a28803f0935e07
+    # MA requires host networking; bind it to 127.0.0.1 in its settings right after first start.
+    network_mode: host
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - music-assistant:/data
+    # Not read_only: MA writes outside /data (caches, provider state); unverified which paths.
+    depends_on: [po-token]
+
+  po-token:
+    <<: *hardening
+    # bgutil-ytdlp-pot-provider 1.2.1, the version Music Assistant requires (same pin as modules/po-token.nix).
+    image: docker.io/brainicism/bgutil-ytdlp-pot-provider@sha256:7064546d70a58680aec236b50859c4fca065092d7ed462c85ea5d897b003095e
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    # Unauthenticated server: loopback only.
+    ports: ["127.0.0.1:4416:4416"]
+
+  squeezelite:
+    <<: *hardening
+    build: compose/squeezelite
+    network_mode: host
+    # Host user owning the PipeWire session; the Pulse socket only accepts that uid.
+    user: "${HOST_UID}:${HOST_GID}"
+    read_only: true
+    tmpfs: [/tmp]
+    environment:
+      TZ: ${TZ}
+      HOME: /tmp
+      PULSE_SERVER: unix:/run/pulse/native
+      WORK_DAYS: ${WORK_DAYS}
+      WORK_START: ${WORK_START}
+      WORK_END: ${WORK_END}
+      OUTPUT_DEVICE: ${OUTPUT_DEVICE:-}
+    volumes:
+      - /run/user/${HOST_UID}/pulse/native:/run/pulse/native
+    depends_on: [music-assistant]
+
+  caddy:
+    <<: *hardening
+    build: compose/caddy
+    network_mode: host
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    environment:
+      FQDN: ${FQDN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      ADMIN_NETS: ${ADMIN_NETS}
+    secrets: [cloudflare-token]
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+  bridge:
+    <<: *hardening
+    build: bridge
+    network_mode: host
+    read_only: true
+    tmpfs: [/tmp]
+    environment:
+      TZ: ${TZ}
+      JUKEBOX_TENANT_ID: ${BRIDGE_TENANT_ID}
+      JUKEBOX_CLIENT_ID: ${BRIDGE_CLIENT_ID}
+      JUKEBOX_TEAM_ID: ${BRIDGE_TEAM_ID}
+      JUKEBOX_CHANNEL_ID: ${BRIDGE_CHANNEL_ID}
+      JUKEBOX_ADMIN_IDS: ${BRIDGE_ADMIN_IDS:-}
+      JUKEBOX_ALLOWED_DOMAINS: ${BRIDGE_ALLOWED_DOMAINS:-music.youtube.com,youtube.com,youtu.be}
+      JUKEBOX_RETENTION_DAYS: ${BRIDGE_RETENTION_DAYS:-90}
+    secrets: [graph-key, graph-thumbprint, ma-token, workflows-url]
+    volumes:
+      - bridge:/data
+    depends_on: [music-assistant]
+
+secrets:
+  cloudflare-token:
+    file: ./secrets/cloudflare-token
+  graph-key:
+    file: ./secrets/graph-key
+  graph-thumbprint:
+    file: ./secrets/graph-thumbprint
+  ma-token:
+    file: ./secrets/ma-token
+  workflows-url:
+    file: ./secrets/workflows-url
+
+volumes:
+  music-assistant:
+  caddy-data:
+  caddy-config:
+  bridge:

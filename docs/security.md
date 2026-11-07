@@ -122,7 +122,7 @@ Every directive left off carries a one-line comment with the reason.
 2. Messages posted by applications (including the bot's own Workflows posts) are ignored.
 3. Journal: timestamp, author Entra object ID, command name. Never the text of other messages.
 4. Commands are allowlisted; arguments are validated; spawning a shell/subprocess with user input MUST NOT happen.
-5. Links are accepted only from allowlisted domains (music.youtube.com, youtube.com, youtu.be, plus enabled services).
+5. Links are accepted only from `bridge.allowedDomains`, an enum of hosts the bridge has a parser for (`music.youtube.com`, `youtube.com`, `youtu.be`). Only plain `https` single-track links pass; the track ID is checked against Music Assistant, and unavailable tracks are refused. A message whose only links are non-music is ignored and not logged.
 6. Per-user and global rate limits; admin commands (stop, volume, ban) restricted to the object ID allowlist.
 7. The channel description tells employees that the bot reads messages addressed to it and what is logged.
 8. Request/play log (decision 2026-11-07: full per-person log, for reports):

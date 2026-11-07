@@ -1,0 +1,26 @@
+# Mirrors modules/caddy.nix and the /stats block of modules/teams-bridge.nix.
+{
+	email {$ACME_EMAIL}
+	# No admin API: config changes ship as a new image, applied by restarting the container.
+	admin off
+	# Port 80 stays closed (QR codes and links are https); no HTTP/3, office firewalls drop QUIC.
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$FQDN} {
+	tls {
+		dns cloudflare {file./run/secrets/cloudflare-token}
+	}
+
+	@adminOnly {
+		path /mcp/* /stats*
+		not remote_ip {$ADMIN_NETS}
+	}
+	respond @adminOnly 403
+
+	reverse_proxy /stats* 127.0.0.1:8096
+	reverse_proxy 127.0.0.1:8095
+}

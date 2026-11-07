@@ -19,6 +19,7 @@ from .commands import ADMIN_COMMANDS, HELP, Command, RateLimiter, parse
 from .config import Config
 from .graph import GraphPoller, Message
 from .jukebox import Jukebox, JukeboxError
+from .links import first_music_link
 from .report import format_summary, render_page
 from .store import Store
 from .tracker import PlayTracker
@@ -40,7 +41,9 @@ async def handle(
         case "play":
             if not is_admin and not limiter.allow(msg.author_id):
                 raise JukeboxError("request limit reached, try again later")
-            return await jukebox.play(cmd.arg, msg.author_id, msg.author_name)
+            # Teams sends links as anchors; the href beats the visible text.
+            query = first_music_link(msg.links, cfg.allowed_domains) or cmd.arg
+            return await jukebox.play(query, msg.author_id, msg.author_name)
         case "skip":
             return await jukebox.vote_skip(msg.author_id, is_admin)
         case "np":
@@ -108,7 +111,11 @@ async def run(cfg: Config) -> None:
                 for msg in messages:
                     cmd = parse(msg.text, cfg.prefix)
                     if cmd is None:
-                        continue
+                        # A bare music link is an order; any other chatter is ignored.
+                        link = first_music_link(msg.links, cfg.allowed_domains)
+                        if link is None:
+                            continue
+                        cmd = Command("play", link)
                     log.info("author=%s command=%s", msg.author_id, cmd.name)
                     ok = True
                     try:
