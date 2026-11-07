@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jukebox-bridge"
+version = "0.1.0"
+description = "Teams channel -> Music Assistant command bridge"
+requires-python = ">=3.12"
+dependencies = ["aiohttp", "msal", "music-assistant-client"]
+
+[project.scripts]
+jukebox-bridge = "jukebox_bridge.__main__:main"
