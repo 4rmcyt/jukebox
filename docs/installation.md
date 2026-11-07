@@ -293,13 +293,13 @@ Play a track during work hours and confirm it comes out of the speaker.
 
 ## 13. Microsoft 365: Teams bridge (optional)
 
-Commands in the channel: `!dj play <song or link>`, `!dj skip` (vote), `!dj np`, `!dj help`; admins also `!dj stop`. The bridge reads the channel through Graph with an app-only RSC permission and replies through a Workflows webhook — Graph has no app-only channel posting outside migration ([security.md §5](security.md#5-accounts)).
+Commands in the channel: `!dj play <song or link>`, `!dj skip` (vote), `!dj np`, `!dj stats` (last 7 days), `!dj stats optout|optin`, `!dj help`; admins also `!dj stop`. The bridge reads the channel through Graph with an app-only RSC permission and replies through a Workflows webhook — Graph has no app-only channel posting outside migration ([security.md §5](security.md#5-accounts)).
 
 ### 13.1 Team
 
 1. Create a dedicated **private** team "Jukebox" with a single channel. RSC is granted per team, so the team boundary is what limits the bridge to that one channel.
 2. Owners: you + the service account. Members: whoever may use the bot.
-3. Channel description: state that the bot reads messages addressed to it and that author ID + command are logged ([§9.7](security.md#9-teams-bridge)).
+3. Channel description: state that the bot reads messages addressed to it; that each request (who, what, when) and each played track is recorded for `retentionDays` (default 90); that weekly stats with the top requesters (name + count, no tracks) are posted in the channel; and that `!dj stats optout` hides you from that list ([§9.7–9.8](security.md#9-teams-bridge)).
 4. IDs: channel `…` → **Get link to channel**. The link contains `groupId=<teamId>` and the channel ID `19:…@thread.tacv2` (URL-decode it).
 
 ### 13.2 Entra app registration
@@ -365,6 +365,7 @@ Signed in as the **service account**, in the Jukebox channel → **Workflows** �
    ```
 4. Push, `nix flake update private`, deploy.
 5. Post `!dj help` in the channel — the reply arrives via Workflows within a few seconds. `journalctl -u teams-bridge` shows `author=<id> command=help`.
+6. Reports: `!dj stats` in the channel; full per-person log at `https://<fqdn>/stats` (admin nets only, `?days=1|7|30|90`); weekly summary posted automatically on the last work day at the end of work hours (`systemctl list-timers teams-bridge-report`). Retention: `bridge.retentionDays` in `office.nix`.
 
 ## 14. MCP clients (optional)
 

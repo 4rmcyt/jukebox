@@ -15,6 +15,7 @@ Items marked ⚠ are binding, but the exact mechanism has not yet been checked a
 | Workflows webhook URL | Posting arbitrary content to the channel |
 | Cloudflare DNS API token | Editing DNS records of the company zone — redirecting company hostnames, issuing certificates for them |
 | Teams channel messages | Leak of employee conversations |
+| Request/play log | Per-person record of employees' music requests |
 | The device itself | Disk theft with secrets on it |
 
 **Adversaries:** any user on the office network (incl. guest Wi-Fi), any member of the Teams team, someone with physical access, a compromised dependency (supply chain).
@@ -119,11 +120,19 @@ Every directive left off carries a one-line comment with the reason.
 
 1. Only messages addressed to the bot (prefix/mention) are processed. Other messages are neither stored nor logged.
 2. Messages posted by applications (including the bot's own Workflows posts) are ignored.
-3. Logged: timestamp, author Entra object ID, command, result. Never the text of other messages.
+3. Journal: timestamp, author Entra object ID, command name. Never the text of other messages.
 4. Commands are allowlisted; arguments are validated; spawning a shell/subprocess with user input MUST NOT happen.
 5. Links are accepted only from allowlisted domains (music.youtube.com, youtube.com, youtu.be, plus enabled services).
 6. Per-user and global rate limits; admin commands (stop, volume, ban) restricted to the object ID allowlist.
 7. The channel description tells employees that the bot reads messages addressed to it and what is logged.
+8. Request/play log (decision 2026-11-07: full per-person log, for reports):
+   - Stored in SQLite under the bridge's state directory (`/var/lib/private/teams-bridge`, DynamicUser, 0700, on the LUKS disk).
+   - Requests (Teams only): time, author object ID and display name, command, its argument (search text), the bot's reply, success flag. Only commands addressed to the bot — §9.1 still holds.
+   - Plays: time, track, artists, duration, source (`teams` with requester / `party` anonymous / `other`). Party guests are never identified.
+   - Retention: `jukebox.bridge.retentionDays` (default 90), pruned at start, daily and on each weekly report.
+   - Access: the full log only on `https://<fqdn>/stats`, which Caddy restricts to `jukebox.adminNets`. `!dj stats` and the weekly channel post show aggregates and the top-10 requesters by display name and request count — never which tracks a person requested.
+   - Opt-out: `!dj stats optout` hides the author from the public top DJs (`optin` reverts); their requests stay in the IT log. The opt-out list is a preference, not log data, and is not pruned by retention.
+   - The channel description MUST say this: what is recorded, for how long, and that the top requesters are shown in the channel. Whether this meets the company's privacy obligations to employees (Alberta PIPA) is a company decision, not a technical one.
 
 ## 10. Kiosk
 
@@ -170,7 +179,9 @@ Before going live and after any major change:
 - [ ] `git grep` finds no secrets in the repo; the Nix store contains no secrets
 - [ ] TPM unlock works; with Secure Boot off it does not
 - [ ] BT: the host is not discoverable; pairing a new device fails
-- [ ] Bridge: a message not addressed to the bot does not appear in logs
+- [ ] Bridge: a message not addressed to the bot does not appear in logs or in the request log
+- [ ] `/stats` returns 403 from a staff VLAN
+- [ ] Entries older than `retentionDays` are gone after the weekly report
 - [ ] Party: limits hold when tested from two different phones
 
 ## Exceptions

@@ -8,6 +8,7 @@ from music_assistant_client import MusicAssistantClient
 from music_assistant_models.enums import MediaType, QueueOption
 
 from .config import Config
+from .tracker import PlayTracker
 
 
 class JukeboxError(Exception):
@@ -15,9 +16,10 @@ class JukeboxError(Exception):
 
 
 class Jukebox:
-    def __init__(self, client: MusicAssistantClient, cfg: Config) -> None:
+    def __init__(self, client: MusicAssistantClient, cfg: Config, tracker: PlayTracker) -> None:
         self._client = client
         self._cfg = cfg
+        self._tracker = tracker
         self._skip_votes: dict[str, set[str]] = {}
 
     def _queue_id(self) -> str:
@@ -31,13 +33,13 @@ class Jukebox:
         if not any(host == d or host.endswith(f".{d}") for d in self._cfg.allowed_domains):
             raise JukeboxError("links are accepted only from: " + ", ".join(self._cfg.allowed_domains))
 
-    async def play(self, query: str) -> str:
+    async def play(self, query: str, author_id: str, author_name: str) -> str:
         if not query:
             raise JukeboxError("usage: play <song or link>")
         queue_id = self._queue_id()
         if query.startswith(("http://", "https://")):
             self._check_url(query)
-            # TODO: verify MA resolves YT Music URLs to tracks; duration is not checked for links.
+            # TODO: verify MA resolves YT Music URLs to tracks; duration is not checked and the play is not attributed for links.
             await self._client.player_queues.play_media(queue_id, query, option=QueueOption.ADD)
             return "added link to the queue"
 
@@ -49,6 +51,7 @@ class Jukebox:
         duration = getattr(track, "duration", 0) or 0
         if duration > self._cfg.max_track_seconds:
             raise JukeboxError(f"“{track.name}” is longer than {self._cfg.max_track_seconds // 60} min")
+        self._tracker.expect(track.uri, author_id, author_name)
         await self._client.player_queues.play_media(queue_id, track, option=QueueOption.ADD)
         artists = ", ".join(a.name for a in getattr(track, "artists", []))
         return f"queued {artists} — {track.name}" if artists else f"queued {track.name}"

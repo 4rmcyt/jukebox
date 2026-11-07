@@ -5,11 +5,14 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-COMMANDS = frozenset({"play", "skip", "np", "help", "stop"})
+COMMANDS = frozenset({"play", "skip", "np", "stats", "help", "stop"})
 ADMIN_COMMANDS = frozenset({"stop"})
 MAX_ARG_LENGTH = 200
 
-HELP = "play <song or link> · skip (vote) · np (now playing) · help"
+HELP = (
+    "play <song or link> · skip (vote) · np (now playing) · stats (last 7 days)"
+    " · stats optout / optin (hide or show yourself in the top DJs) · help"
+)
 
 
 @dataclass(frozen=True)

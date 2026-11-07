@@ -11,6 +11,18 @@ def _credential(name: str) -> str:
     return (Path(os.environ["CREDENTIALS_DIRECTORY"]) / name).read_text().strip()
 
 
+def db_path() -> Path:
+    return Path(os.environ["STATE_DIRECTORY"]) / "jukebox.db"
+
+
+def workflows_url() -> str:
+    return _credential("workflows-url")
+
+
+def retention_days() -> int:
+    return int(_env("RETENTION_DAYS", "90"))
+
+
 def _env(name: str, default: str | None = None) -> str:
     value = os.environ.get(f"JUKEBOX_{name}", default)
     if value is None:
@@ -42,6 +54,9 @@ class Config:
     skip_votes: int
     requests_per_user: int
     request_refill_seconds: int
+    db_path: Path
+    stats_port: int
+    retention_days: int
 
     @classmethod
     def from_env(cls) -> Config:
@@ -55,7 +70,7 @@ class Config:
             ma_url=_env("MA_URL", "http://127.0.0.1:8095"),
             ma_token=_credential("ma-token"),
             ma_player=_env("MA_PLAYER", "Jukebox"),
-            workflows_url=_credential("workflows-url"),
+            workflows_url=workflows_url(),
             prefix=_env("PREFIX", "!dj"),
             admin_ids=frozenset(_env_list("ADMIN_IDS")),
             allowed_domains=_env_list("ALLOWED_DOMAINS"),
@@ -64,4 +79,7 @@ class Config:
             skip_votes=int(_env("SKIP_VOTES", "3")),
             requests_per_user=int(_env("REQUESTS_PER_USER", "3")),
             request_refill_seconds=int(_env("REQUEST_REFILL_SECONDS", "600")),
+            db_path=db_path(),
+            stats_port=int(_env("STATS_PORT", "8096")),
+            retention_days=retention_days(),
         )

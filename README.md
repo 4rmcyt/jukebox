@@ -23,8 +23,8 @@ modules/
   caddy.nix                HTTPS on 443 (Let's Encrypt via Cloudflare DNS-01) -> MA on loopback
   po-token.nix             bgutil PO Token server (podman, loopback only)
   kiosk.nix                cage + Chromium kiosk with enterprise policies
-  teams-bridge.nix         Teams bridge service (off until jukebox.bridge.enable)
-bridge/                    Teams bridge: Graph polling -> Music Assistant -> Workflows replies
+  teams-bridge.nix         Teams bridge + weekly report timer + /stats route (off until jukebox.bridge.enable)
+bridge/                    Teams bridge: Graph polling -> Music Assistant -> Workflows replies; request/play log + reports
 docs/private-example.nix   schema of the private input
 ```
 

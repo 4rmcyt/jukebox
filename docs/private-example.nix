@@ -15,5 +15,7 @@
     teamId = "00000000-0000-0000-0000-000000000000";
     channelId = "19:00000000000000000000000000000000@thread.tacv2";
     adminIds = ["00000000-0000-0000-0000-000000000000"];
+    # Optional, default 90: days the per-person request/play log is kept.
+    retentionDays = 90;
   };
 }
